@@ -1,5 +1,5 @@
 import 'package:charts_flutter/flutter.dart' as chart;
-import 'package:count_step_tracking/extensions/DoubleExtension.dart';
+import 'package:count_step_tracking/extensions/IntExtension.dart';
 import 'package:count_step_tracking/utils/AppColors.dart';
 import 'package:count_step_tracking/utils/AppImage.dart';
 import 'package:flutter/cupertino.dart';
@@ -15,26 +15,33 @@ class MyApp extends StatefulWidget {
     return MyStateApp();
   }
 }
-
+const int _maxTargetSteps = 4000;
 class MyStateApp extends State<MyApp> with SingleTickerProviderStateMixin {
+  /// quản lý số lượng tab và điều hướng tab bar và tab view tương ứng
   late TabController _tabController;
-  double _currentSteps = 600;
-  double _maxTargetSteps = 4000;
+  int _currentSteps = 100;
+  // điều chỉnh vị trí thanh divider target lớn nhất
+  int _maxDisplayTargetValue = (_maxTargetSteps*0.9).toInt();
+  // giá trị nhỏ nhất hiển thị trên thanh progress bar
+  int _minDisplayValue = (_maxTargetSteps*0.01).toInt();
   double _spacingHorizontal = 20;
+  // màu của progress bar
   Color _progressBarColor = Colors.blueGrey;
-  double _currentPercentValue = 0;
+  // màu của thanh progress hiện tại
+  Gradient _currentProgressBarColor = AppColors.progressBarGradient;
   String _title = "Step Count";
+  /// các mốc mục tiêu bước
   List<int> _listTarget = [500, 2000, 4000];
 
   @override
   void initState() {
-    _currentPercentValue = _currentSteps / _maxTargetSteps;
     _tabController = TabController(length: 3, vsync: this);
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    _currentSteps = 1900;
     return Scaffold(
       appBar: AppBar(
           title: Text(_title),
@@ -54,14 +61,15 @@ class MyStateApp extends State<MyApp> with SingleTickerProviderStateMixin {
     );
   }
 
+  /// Tab bar title
   Widget _buildTabBar() => Center(
       child: Container(
-          height: 36,
+          height: 30,
           margin: EdgeInsets.symmetric(horizontal: 60),
           decoration: BoxDecoration(
             color: Colors.grey[300],
             borderRadius: BorderRadius.circular(
-              25.0,
+              20,
             ),
           ),
           child: TabBar(
@@ -69,7 +77,7 @@ class MyStateApp extends State<MyApp> with SingleTickerProviderStateMixin {
               labelPadding: EdgeInsets.all(0),
               indicator: BoxDecoration(
                 borderRadius: BorderRadius.circular(
-                  25.0,
+                  20,
                 ),
                 color: Colors.green,
               ),
@@ -82,6 +90,7 @@ class MyStateApp extends State<MyApp> with SingleTickerProviderStateMixin {
                 Tab(text: "Tháng"),
               ])));
 
+  /// Các tab view
   Widget _buildTabView() => Expanded(
         child: TabBarView(
           controller: _tabController,
@@ -92,7 +101,7 @@ class MyStateApp extends State<MyApp> with SingleTickerProviderStateMixin {
           ],
         ),
       );
-
+  /// Hiển thị số bước chân trong ngày (text)
   Widget _buildTodayStepsCount() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: _spacingHorizontal),
@@ -163,46 +172,43 @@ class MyStateApp extends State<MyApp> with SingleTickerProviderStateMixin {
     );
   }
 
+  /// Hiển thị số bước chân trong ngày dưới dạng progress bar
   Widget _buildStepsCountProgress() {
     return LayoutBuilder(
-      builder: (buildContext, constraints) => Container(
-        margin: EdgeInsets.symmetric(vertical: 6),
-        height: kToolbarHeight,
-        color: Colors.white,
-        child: Column(
-          children: [
-            Container(
-              alignment: Alignment.centerLeft,
-              child: Stack(
-                children: [
-                  _buildTextTargetValue(constraints.maxWidth, 500),
-                  _buildTextTargetValue(constraints.maxWidth, 2000),
-                  _buildTextTargetValue(constraints.maxWidth, 3000),
-                ],
-              ),
-            ),
-            SizedBox(height: 3),
-            Container(
-              child: Stack(
+      builder: (buildContext, constraints) {
+        var bodyWidth = constraints.maxWidth - _spacingHorizontal * 2;
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: 6, horizontal: _spacingHorizontal),
+          height: kToolbarHeight,
+          color: Colors.white,
+          child: Column(
+            children: [
+              Expanded(child: Container(
                 alignment: Alignment.centerLeft,
-                children: [
-                  _buildTargetDivider(constraints.maxWidth, 500),
-                  _buildTargetDivider(constraints.maxWidth, 2000),
-                  _buildTargetDivider(constraints.maxWidth, 3000),
-                  _buildProgressBar(),
-                  _buildCurrentProgressBar(
-                      constraints.maxWidth * _currentPercentValue),
-                ],
+                child: Stack(
+                  children: _listTarget.map((targetValue) => _buildTextTargetValue(bodyWidth, targetValue)).toList(),
+                ),
+              )),
+              SizedBox(height: 3),
+              Container(
+                child: Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    _buildListTargetDivider(bodyWidth, _listTarget),
+                    _buildProgressBar(),
+                    _buildCurrentProgressBar(bodyWidth, _currentSteps, _maxTargetSteps),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      }
     );
   }
 
+  /// Hiển thị mục tiêu số bước chân = progress bar
   Widget _buildProgressBar() => Container(
-        margin: EdgeInsets.symmetric(horizontal: _spacingHorizontal),
         height: 20,
         decoration: ShapeDecoration(
             color: _progressBarColor,
@@ -210,31 +216,47 @@ class MyStateApp extends State<MyApp> with SingleTickerProviderStateMixin {
                 borderRadius: BorderRadius.all(Radius.circular(24)))),
       );
 
-  Widget _buildCurrentProgressBar(double currentWidth) => Container(
-      margin: EdgeInsets.symmetric(horizontal: _spacingHorizontal),
-      width: currentWidth,
-      height: 20,
-      decoration: BoxDecoration(
-          gradient: AppColors.barGradient,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _progressBarColor, width: 2),
-          shape: BoxShape.rectangle));
+  /// Hiển thị quá trình bước chân hiện tại
+  Widget _buildCurrentProgressBar(double bodyWidth, int currentValue, int maxTargetValue) {
+    double borderSide = 2;
+    int currentStepDisplay = currentValue.compareTo(_minDisplayValue) == 1  ? currentValue : _minDisplayValue;
+    var currentWidth = bodyWidth *(currentStepDisplay / maxTargetValue) + (borderSide * 2) ;
+    return Container(
+        width: currentWidth,
+        height: 20,
+        decoration: BoxDecoration(
+            gradient: _currentProgressBarColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _progressBarColor, width: borderSide),
+            shape: BoxShape.rectangle));
+  }
 
-  Widget _buildTargetDivider(double maxWidth, int targetValue) => Container(
-        margin:
-            EdgeInsets.only(left: maxWidth * (targetValue / _maxTargetSteps)),
-        height: 28,
-        width: 2,
-        color: _progressBarColor,
-      );
+  /// Hiển thị các mốc mục tiêu
+  Widget _buildListTargetDivider(double bodyWidth, List<int> listTargetValue){
+    return Stack(children: listTargetValue.map((targetValue) => _buildTargetDivider(bodyWidth, targetValue)).toList());
+  }
 
-  Widget _buildTextTargetValue(double maxWidth, int targetValue) {
+  /// Mốc mục tiêu
+  Widget _buildTargetDivider(double bodyWidth, int targetValue) {
+    if(targetValue > _maxDisplayTargetValue) targetValue = _maxDisplayTargetValue;
+    return Container(
+      margin:
+      EdgeInsets.only(left: bodyWidth * (targetValue / _maxTargetSteps)),
+      height: 28,
+      width: 2,
+      color: _progressBarColor,
+    );
+  }
+
+  /// Text thể hiện giá trị mục tiêu
+  Widget _buildTextTargetValue(double bodyWidth, int targetValue) {
     double textSize = 14;
+    int displayValue = (targetValue.compareTo(_maxDisplayTargetValue) == 1) ? _maxDisplayTargetValue : targetValue;
     var textLength = targetValue.toString().length;
     var textSpacing = (textLength / 2) * (textSize / 2);
     return Container(
       margin: EdgeInsets.only(
-          left: maxWidth * (targetValue / _maxTargetSteps) - textSpacing),
+          left: bodyWidth * ( displayValue / _maxTargetSteps) - textSpacing),
       child: Text(
         "$targetValue",
         style: TextStyle(
@@ -245,38 +267,42 @@ class MyStateApp extends State<MyApp> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget _buildStepCountChart(List<chart.Series<SimpleData, String>> listData) => Container(padding: EdgeInsets.symmetric(horizontal: _spacingHorizontal, vertical: _spacingHorizontal), child: chart.BarChart(listData, animate: false,),);
+  /// Hiển thị quá trình số bước chân dạng Chart
+  Widget _buildStepCountChart(List<chart.Series<StepCountData, String>> listData) => Container(padding: EdgeInsets.symmetric(horizontal: _spacingHorizontal, vertical: _spacingHorizontal), child: chart.BarChart(listData, animate: false,),);
 
-  List<chart.Series<SimpleData, String>> _generateSimpleData() {
-    final data = [
-      SimpleData("2014", 45),
-      SimpleData("2014", 35),
-      SimpleData("2015", 5),
-      SimpleData("2016", 75),
-      SimpleData("2017", 45),
-      SimpleData("2018", 55),
+  List<chart.Series<StepCountData, String>> _generateSimpleData() {
+    final listData = [
+      StepCountData("T2", 45),
+      StepCountData("T3", 35),
+      StepCountData("T4", 5),
+      StepCountData("T5", 75),
+      StepCountData("T6", 45),
+      StepCountData("T7", 55),
+      StepCountData("CN", 155),
     ];
-
+    String currentDays = "T2";
     return [
-      chart.Series<SimpleData, String>(
+      chart.Series<StepCountData, String>(
           id: "Data",
-          colorFn: (SimpleData data, __) {
-            if (data.time == "2018") {
+          colorFn: (StepCountData data, __) {
+            if (data.time == currentDays) {
               return chart.MaterialPalette.green.shadeDefault;
             } else
               return chart.MaterialPalette.blue.shadeDefault;
           },
-          // display name, work như ID, nếu trong list data có 1 data cùng domainFn thì sẽ lấy data mới nhất đc add vào
-          domainFn: (SimpleData data, _) => "Year ${data.time}",
-          measureFn: (SimpleData data, _) => data.value,
-          data: data)
+          // vừa là display name, vừa là ID,
+          // nếu trong list data có 1 data cùng domainFn thì data add sau sẽ thực hiện ghi đè lên data cũ có cùng domainFn
+          domainFn: (StepCountData data, _) => "${data.time}",
+          // giá trị để hiển thị ( display value)
+          measureFn: (StepCountData data, _) => data.value,
+          data: listData)
     ];
   }
 }
 
-class SimpleData {
+class StepCountData {
   final String time;
   final int value;
 
-  const SimpleData(this.time, this.value);
+  const StepCountData(this.time, this.value);
 }
