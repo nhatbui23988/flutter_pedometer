@@ -35,6 +35,8 @@ dependencies:
   floor_generator: ^1.1.0
   week_of_year: ^2.0.0
   fluttertoast: ^8.0.8
+  shared_preferences: ^2.0.7
+  permission_handler: ^8.1.4+2
 
 dev_dependencies:
   flutter_test:
